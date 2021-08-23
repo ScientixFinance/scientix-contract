@@ -79,7 +79,7 @@ library Pool {
     return _data.accumulatedRewardWeight.add(_rewardWeight);
   }
 
-  function getBlockReward(Context memory _ctx, uint256 _rewardWeight, uint256 _from, uint256 _to) internal view returns (uint256) {
+  function getBlockReward(Context memory _ctx, uint256 _rewardWeight, uint256 _from, uint256 _to) internal pure returns (uint256) {
     uint256 lastReductionBlock = _ctx.startBlock + _ctx.blocksPerEpoch * _ctx.totalReducedEpochs;
 
     if (_from >= lastReductionBlock) {
@@ -99,7 +99,7 @@ library Pool {
     return totalRewards + getReduceBlockReward(_ctx, _rewardWeight, _from, _to);
   }
 
-  function getReduceBlockReward(Context memory _ctx, uint256 _rewardWeight, uint256 _from, uint256 _to) internal view returns (uint256) {
+  function getReduceBlockReward(Context memory _ctx, uint256 _rewardWeight, uint256 _from, uint256 _to) internal pure returns (uint256) {
     _from = Math.max(_ctx.startBlock, _from);
     if (_from >= _to) {
       return 0;

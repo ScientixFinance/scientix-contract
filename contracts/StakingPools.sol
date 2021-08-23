@@ -16,6 +16,9 @@ import {Pool} from "./libraries/pools/Pool.sol";
 import {Stake} from "./libraries/pools/Stake.sol";
 import {StakingPools} from "./StakingPools.sol";
 
+import {ReentrancyGuardPausable} from './ReentrancyGuardPausable.sol';
+import {UpgradeableOwnable} from './UpgradeableOwnable.sol';
+
 
 
 /// @title StakingPools
@@ -35,7 +38,7 @@ import {StakingPools} from "./StakingPools.sol";
 ///
 /// This contract was inspired by Chef Nomi's 'MasterChef' contract which can be found in this
 /// repository: https://github.com/sushiswap/sushiswap.
-contract StakingPools is ReentrancyGuard {
+contract StakingPools is UpgradeableOwnable, ReentrancyGuardPausable {
   using FixedPointMath for FixedPointMath.uq192x64;
   using Pool for Pool.Data;
   using Pool for Pool.List;
@@ -49,6 +52,10 @@ contract StakingPools is ReentrancyGuard {
 
   event GovernanceUpdated(
     address governance
+  );
+
+  event RewardRateUpdated(
+    uint256 rewardRate
   );
 
   event PoolRewardWeightUpdated(
@@ -100,7 +107,9 @@ contract StakingPools is ReentrancyGuard {
   /// @dev A mapping of all of the user stakes mapped first by pool and then by address.
   mapping(address => mapping(uint256 => Stake.Data)) private _stakes;
 
-  constructor(
+  constructor () public {}
+  
+  function initialize(
     IMintableERC20 _reward,
     address _governance,
     uint256 _rewardRate,
@@ -108,7 +117,10 @@ contract StakingPools is ReentrancyGuard {
     uint256 _startBlock,
     uint256 _blocksPerEpoch,
     uint256 _totalReducedEpochs
-  ) public {
+  )         
+    external
+    onlyOwner
+ {
     require(_governance != address(0), "StakingPools: governance address cannot be 0x0");
 
     reward = _reward;
@@ -147,6 +159,14 @@ contract StakingPools is ReentrancyGuard {
 
     emit GovernanceUpdated(_pendingGovernance);
   }
+
+  function setRewardRate(uint256 _rewardRate) external onlyGovernance {
+    _updatePools();
+
+    _ctx.rewardRate = _rewardRate;
+
+    emit RewardRateUpdated(_rewardRate);
+  }  
 
   /// @dev Creates a new pool.
   ///
@@ -206,7 +226,7 @@ contract StakingPools is ReentrancyGuard {
   ///
   /// @param _poolId        the pool to deposit tokens into.
   /// @param _depositAmount the amount of tokens to deposit.
-  function deposit(uint256 _poolId, uint256 _depositAmount) external nonReentrant {
+  function deposit(uint256 _poolId, uint256 _depositAmount) external nonReentrantAndUnpaused {
     Pool.Data storage _pool = _pools.get(_poolId);
     _pool.update(_ctx);
 
@@ -220,7 +240,7 @@ contract StakingPools is ReentrancyGuard {
   ///
   /// @param _poolId          The pool to withdraw staked tokens from.
   /// @param _withdrawAmount  The number of tokens to withdraw.
-  function withdraw(uint256 _poolId, uint256 _withdrawAmount) external nonReentrant {
+  function withdraw(uint256 _poolId, uint256 _withdrawAmount) external nonReentrantAndUnpaused {
     Pool.Data storage _pool = _pools.get(_poolId);
     _pool.update(_ctx);
 
@@ -236,7 +256,7 @@ contract StakingPools is ReentrancyGuard {
   /// @param _poolId The pool to claim rewards from.
   ///
   /// @notice use this function to claim the tokens from a corresponding pool by ID.
-  function claim(uint256 _poolId) external nonReentrant {
+  function claim(uint256 _poolId) external nonReentrantAndUnpaused {
     Pool.Data storage _pool = _pools.get(_poolId);
     _pool.update(_ctx);
 
@@ -249,7 +269,7 @@ contract StakingPools is ReentrancyGuard {
   /// @dev Claims all rewards from a pool and then withdraws all staked tokens.
   ///
   /// @param _poolId the pool to exit from.
-  function exit(uint256 _poolId) external nonReentrant {
+  function exit(uint256 _poolId) external nonReentrantAndUnpaused {
     Pool.Data storage _pool = _pools.get(_poolId);
     _pool.update(_ctx);
 
