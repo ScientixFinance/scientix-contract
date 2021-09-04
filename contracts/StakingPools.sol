@@ -9,12 +9,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/Initializable.sol";
 
 import {FixedPointMath} from "./libraries/FixedPointMath.sol";
 import {IMintableERC20} from "./interfaces/IMintableERC20.sol";
 import {Pool} from "./libraries/pools/Pool.sol";
 import {Stake} from "./libraries/pools/Stake.sol";
-import {StakingPools} from "./StakingPools.sol";
 
 import {ReentrancyGuardPausable} from './ReentrancyGuardPausable.sol';
 import {UpgradeableOwnable} from './UpgradeableOwnable.sol';
@@ -38,7 +38,7 @@ import {UpgradeableOwnable} from './UpgradeableOwnable.sol';
 ///
 /// This contract was inspired by Chef Nomi's 'MasterChef' contract which can be found in this
 /// repository: https://github.com/sushiswap/sushiswap.
-contract StakingPools is UpgradeableOwnable, ReentrancyGuardPausable {
+contract StakingPools is UpgradeableOwnable, ReentrancyGuardPausable, Initializable {
   using FixedPointMath for FixedPointMath.uq192x64;
   using Pool for Pool.Data;
   using Pool for Pool.List;
@@ -119,6 +119,7 @@ contract StakingPools is UpgradeableOwnable, ReentrancyGuardPausable {
     uint256 _totalReducedEpochs
   )         
     external
+    initializer
     onlyOwner
  {
     require(_governance != address(0), "StakingPools: governance address cannot be 0x0");

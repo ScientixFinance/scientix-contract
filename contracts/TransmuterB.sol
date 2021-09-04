@@ -79,6 +79,9 @@ contract TransmuterB is Context {
     /// @dev scientist addresses whitelisted
     mapping (address => bool) public whiteList;
 
+    /// @dev addresses whitelisted to run keepr jobs (harvest)	
+    mapping (address => bool) public keepers;
+
     /// @dev The threshold above which excess funds will be deployed to yield farming activities
     uint256 public plantableThreshold = 5000000000000000000000000; // 5mm
 
@@ -101,9 +104,21 @@ contract TransmuterB is Context {
     /// @dev The address of the contract which will receive fees.
     address public rewards;
 
+	/// @dev A mapping of adapter addresses to keep track of vault adapters that have already been added	
+    mapping(YearnVaultAdapterWithIndirection => bool) public adapters;
+
     /// @dev A list of all of the vaults. The last element of the list is the vault that is currently being used for
     /// deposits and withdraws. VaultWithIndirections before the last element are considered inactive and are expected to be cleared.
     VaultWithIndirection.List private _vaults;
+
+    /// @dev make sure the contract is only initialized once.	
+    bool public initialized;
+
+    /// @dev mapping of user account to the last block they acted	
+    mapping(address => uint256) public lastUserAction;
+
+    /// @dev number of blocks to delay between allowed user actions	
+    uint256 public minUserActionDelay;
 
     event GovernanceUpdated(
         address governance
@@ -158,12 +173,21 @@ contract TransmuterB is Context {
         bool state
     );
 
+    event KeepersSet(
+        address[] keepers,
+        bool[] states
+    );
+
     event PlantableThresholdUpdated(
         uint256 plantableThreshold
     );
 
     event PlantableMarginUpdated(
         uint256 plantableMargin
+    );
+
+    event MinUserActionDelayUpdated(
+        uint256 minUserActionDelay
     );
 
     event ActiveVaultUpdated(
@@ -200,12 +224,22 @@ contract TransmuterB is Context {
         ScToken = _ScToken;
         Token = _Token;
         TRANSMUTATION_PERIOD = 50;
+        minUserActionDelay = 1;
+        pause = true;
     }
 
     ///@return displays the user's share of the pooled scTokens.
     function dividendsOwing(address account) public view returns (uint256) {
         uint256 newDividendPoints = totalDividendPoints.sub(lastDividendPoints[account]);
         return depositedScTokens[account].mul(newDividendPoints).div(pointMultiplier);
+    }
+
+    /// @dev Checks that caller is not a eoa.
+    ///
+    /// This is used to prevent contracts from interacting.
+    modifier noContractAllowed() {
+        require(!address(msg.sender).isContract() && msg.sender == tx.origin, "no contract calls");
+        _;
     }
 
     ///@dev modifier to fill the bucket and keep bookkeeping correct incase of increase/decrease in shares
@@ -277,11 +311,25 @@ contract TransmuterB is Context {
         _;
     }
 
+    /// @dev A modifier which checks if caller is a keepr.
+    modifier onlyKeeper() {
+        require(keepers[msg.sender], "Transmuter: !keeper");
+        _;
+    }
+
     /// @dev Checks that the current message sender or caller is the governance address.
     ///
     ///
     modifier onlyGov() {
         require(msg.sender == governance, "Transmuter: !governance");
+        _;
+    }
+
+    /// @dev checks that the block delay since a user's last action is longer than the minium delay
+    ///
+    modifier ensureUserActionDelay() {
+        require(block.number.sub(lastUserAction[msg.sender]) >= minUserActionDelay, "action delay not met");
+        lastUserAction[msg.sender] = block.number;
         _;
     }
 
@@ -296,7 +344,10 @@ contract TransmuterB is Context {
     ///@dev claims the base token after it has been transmuted
     ///
     ///This function reverts if there is no realisedToken balance
-    function claim() public {
+    function claim()
+        public
+        noContractAllowed()
+    {
         address sender = msg.sender;
         require(realisedTokens[sender] > 0);
         uint256 value = realisedTokens[sender];
@@ -311,7 +362,11 @@ contract TransmuterB is Context {
     /// This function reverts if you try to draw more tokens than you deposited
     ///
     ///@param amount the amount of scTokens to unstake
-    function unstake(uint256 amount) public updateAccount(msg.sender) {
+    function unstake(uint256 amount)
+	    public
+        noContractAllowed()
+        updateAccount(msg.sender)
+    {
         // by calling this function before transmuting you forfeit your gained allocation
         address sender = msg.sender;
         require(depositedScTokens[sender] >= amount,"Transmuter: unstake amount exceeds deposited amount");
@@ -325,6 +380,8 @@ contract TransmuterB is Context {
     ///@param amount the amount of scTokens to stake
     function stake(uint256 amount)
         public
+        noContractAllowed()
+        ensureUserActionDelay()
         runPhasedDistribution()
         updateAccount(msg.sender)
         checkIfNewUser()
@@ -344,7 +401,13 @@ contract TransmuterB is Context {
     /// once the scToken has been converted, it is burned, and the base token becomes realisedTokens which can be recieved using claim()
     ///
     /// reverts if there are no pendingdivs or tokensInBucket
-    function transmute() public runPhasedDistribution() updateAccount(msg.sender) {
+    function transmute()
+        public
+        noContractAllowed()
+        ensureUserActionDelay()
+        runPhasedDistribution()
+        updateAccount(msg.sender)
+    {
         address sender = msg.sender;
         uint256 pendingz = tokensInBucket[sender];
         uint256 diff;
@@ -388,6 +451,8 @@ contract TransmuterB is Context {
     /// @param toTransmute address of the account you will force transmute.
     function forceTransmute(address toTransmute)
         public
+        noContractAllowed()
+        ensureUserActionDelay()
         runPhasedDistribution()
         updateAccount(msg.sender)
         updateAccount(toTransmute)
@@ -438,7 +503,7 @@ contract TransmuterB is Context {
     /// @dev Transmutes and unstakes all scTokens
     ///
     /// This function combines the transmute and unstake functions for ease of use
-    function exit() public {
+    function exit() public noContractAllowed() {
         transmute();
         uint256 toWithdraw = depositedScTokens[msg.sender];
         unstake(toWithdraw);
@@ -447,7 +512,7 @@ contract TransmuterB is Context {
     /// @dev Transmutes and claims all converted base tokens.
     ///
     /// This function combines the transmute and claim functions while leaving your remaining scTokens staked.
-    function transmuteAndClaim() public {
+    function transmuteAndClaim() public noContractAllowed() {
         transmute();
         claim();
     }
@@ -455,7 +520,7 @@ contract TransmuterB is Context {
     /// @dev Transmutes, claims base tokens, and withdraws scTokens.
     ///
     /// This function helps users to exit the transmuter contract completely after converting their scTokens to the base pair.
-    function transmuteClaimAndWithdraw() public {
+    function transmuteClaimAndWithdraw() public noContractAllowed() {
         transmute();
         claim();
         uint256 toWithdraw = depositedScTokens[msg.sender];
@@ -605,16 +670,45 @@ contract TransmuterB is Context {
         emit WhitelistSet(_toWhitelist, _state);
     }
 
+    /// @dev Sets the keeper list
+    ///
+    /// This function reverts if the caller is not governance
+    ///
+    /// @param _keepers the accounts to set states for.
+    /// @param _states the accounts states.
+    function setKeepers(address[] calldata _keepers, bool[] calldata _states) external onlyGov() {
+        uint256 n = _keepers.length;
+        for(uint256 i = 0; i < n; i++) {
+            keepers[_keepers[i]] = _states[i];
+        }
+        emit KeepersSet(_keepers, _states);
+    }
+    /// @dev Initializes the contract.
+    ///
+    /// This function checks that the transmuter and rewards have been set and sets up the active vault.
+    ///
+    /// @param _adapter the vault adapter of the active vault.
+    function initialize(YearnVaultAdapterWithIndirection _adapter) external onlyGov {
+        require(!initialized, "Transmuter: already initialized");
+        require(rewards != ZERO_ADDRESS, "Transmuter: cannot initialize rewards address to 0x0");
+        _updateActiveVault(_adapter);
+        initialized = true;
+    }
+    function migrate(YearnVaultAdapterWithIndirection _adapter) external onlyGov() {
+        _updateActiveVault(_adapter);
+    }
+
     /// @dev Updates the active vault.
     ///
     /// This function reverts if the vault adapter is the zero address, if the token that the vault adapter accepts
     /// is not the token that this contract defines as the parent asset, or if the contract has not yet been initialized.
     ///
     /// @param _adapter the adapter for the new active vault.
-    function setActiveVault(YearnVaultAdapterWithIndirection _adapter) external onlyGov() {
+    function _updateActiveVault(YearnVaultAdapterWithIndirection _adapter) internal {
         require(_adapter != YearnVaultAdapterWithIndirection(ZERO_ADDRESS), "Transmuter: active vault address cannot be 0x0.");
         require(address(_adapter.token()) == Token, "Transmuter.vault: token mismatch.");
-
+        require(!adapters[_adapter], "Adapter already in use");
+        adapters[_adapter] = true;
         _vaults.push(VaultWithIndirection.Data({
             adapter: _adapter,
             totalDeposited: 0
@@ -623,6 +717,30 @@ contract TransmuterB is Context {
         emit ActiveVaultUpdated(_adapter);
     }
 
+    /// @dev Gets the number of vaults in the vault list.
+    ///
+    /// @return the vault count.
+    function vaultCount() external view returns (uint256) {
+        return _vaults.length();
+    }
+    /// @dev Get the adapter of a vault.
+    ///
+    /// @param _vaultId the identifier of the vault.
+    ///
+    /// @return the vault adapter.
+    function getVaultAdapter(uint256 _vaultId) external view returns (address) {
+        VaultWithIndirection.Data storage _vault = _vaults.get(_vaultId);
+        return address(_vault.adapter);
+    }
+    /// @dev Get the total amount of the parent asset that has been deposited into a vault.
+    ///
+    /// @param _vaultId the identifier of the vault.
+    ///
+    /// @return the total amount of deposited tokens.
+    function getVaultTotalDeposited(uint256 _vaultId) external view returns (uint256) {
+        VaultWithIndirection.Data storage _vault = _vaults.get(_vaultId);
+        return _vault.totalDeposited;
+    }
 
     /// @dev Recalls funds from active vault if less than amt exist locally
     ///
@@ -745,6 +863,16 @@ contract TransmuterB is Context {
         emit PlantableMarginUpdated(_plantableMargin);
     }
 
+    /// @dev Sets the minUserActionDelay
+    ///
+    /// This function reverts if the caller is not the current governance.
+    ///
+    /// @param _minUserActionDelay the new min user action delay.
+    function setMinUserActionDelay(uint256 _minUserActionDelay) external onlyGov() {
+        minUserActionDelay = _minUserActionDelay;
+        emit MinUserActionDelayUpdated(_minUserActionDelay);
+    }
+
     /// @dev Sets if the contract should enter emergency exit mode.
     ///
     /// There are 2 main reasons to pause:
@@ -765,7 +893,7 @@ contract TransmuterB is Context {
     /// @param _vaultId the identifier of the vault to harvest from.
     ///
     /// @return the amount of funds that were harvested from the vault.
-    function harvest(uint256 _vaultId) external returns (uint256, uint256) {
+    function harvest(uint256 _vaultId) external onlyKeeper() returns (uint256, uint256) {
 
         VaultWithIndirection.Data storage _vault = _vaults.get(_vaultId);
 

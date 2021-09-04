@@ -84,15 +84,13 @@ library Pool {
 
     if (_from >= lastReductionBlock) {
       return _ctx.rewardRate.sub(_ctx.reducedRewardRatePerEpoch.mul(_ctx.totalReducedEpochs))
-      .mul(_rewardWeight).div(_ctx.totalRewardWeight)
-      .mul(_to - _from);
+      .mul(_rewardWeight).mul(_to - _from).div(_ctx.totalRewardWeight);
     }
 
     uint256 totalRewards = 0;
     if (_to > lastReductionBlock) {
       totalRewards = _ctx.rewardRate.sub(_ctx.reducedRewardRatePerEpoch.mul(_ctx.totalReducedEpochs))
-      .mul(_rewardWeight).div(_ctx.totalRewardWeight)
-      .mul(_to - lastReductionBlock);
+      .mul(_rewardWeight).mul(_to - lastReductionBlock).div(_ctx.totalRewardWeight);
 
       _to = lastReductionBlock;
     }
@@ -113,7 +111,7 @@ library Pool {
       uint256 left = Math.max(epochBegin, _from);
       uint256 right = Math.min(epochEnd, _to);
       if (right > left) {
-        totalRewards += rewardPerBlock.mul(_rewardWeight).div(_ctx.totalRewardWeight).mul(right - left);
+        totalRewards += rewardPerBlock.mul(_rewardWeight).mul(right - left).div(_ctx.totalRewardWeight);
       }
 
       rewardPerBlock = rewardPerBlock.sub(_ctx.reducedRewardRatePerEpoch);

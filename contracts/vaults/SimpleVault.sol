@@ -7,6 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Math} from "@openzeppelin/contracts/math/Math.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/Initializable.sol";
 
 import "./Interfaces.sol";
 import { ReentrancyGuardPausable } from "../ReentrancyGuardPausable.sol";
@@ -22,7 +23,7 @@ import "../interfaces/IyVaultV2.sol";
  * It supports deposits of burning tokens and strategies with entrance fee.
  * The yield optimizing strategy itself is implemented in a separate 'Strategy.sol' contract.
  */
-contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVaultV2Simple {
+contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVaultV2Simple, Initializable {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -71,6 +72,7 @@ contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVa
         uint256 _approvalDelay
     )
         external
+        initializer
         onlyOwner
     {
         assetToken = IERC20(_token);
@@ -162,6 +164,7 @@ contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVa
      * tokens are burned in the process.
      */
     function _withdraw(uint256 _shares, address _recipient) internal returns (uint256) {
+        require(!needWhitelist || isWhitelisted[msg.sender], "not whitelisted");
         strategy.harvest();
 
         uint256 amount = (totalBalance().mul(_shares)).div(totalSupply());

@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/Initializable.sol";
 
 import "./Interfaces.sol";
 import { ReentrancyGuardPausable } from "../ReentrancyGuardPausable.sol";
@@ -59,7 +60,7 @@ interface IFairLaunch {
   function userInfo(uint256 _pid, address user) external view returns (uint256, uint256, uint256, address);
 }
 
-contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStrategy {
+contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStrategy, Initializable {
 
     using SafeERC20 for IERC20;
     using Address for address;
@@ -108,6 +109,7 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         address _vault
     )
         external
+        initializer
         onlyOwner
     {
         poolId = _poolId;
