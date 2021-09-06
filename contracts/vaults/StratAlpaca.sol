@@ -86,6 +86,10 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
 
     address public vault;
 
+    mapping (address => bool) public keepers;
+
+    event KeepersSet(address[] keepers, bool[] states);
+
     constructor() public {}
 
     /*
@@ -139,8 +143,8 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         _;
     }
 
-    modifier onlyVaultOrOwner() {
-        require (msg.sender == vault || msg.sender == owner(), "Must from vault/owner");
+    modifier onlyVaultOrKeeper() {
+        require (msg.sender == vault || keepers[msg.sender], "Must from vault/keeper");
         _;
     }
 
@@ -191,7 +195,7 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         );
     }
 
-    function _harvest() internal {
+    function _harvest(uint256 priceMin) internal {
         if (lastHarvestBlock == block.number) {
             return;
         }
@@ -212,7 +216,7 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         if (alpacaToken != wantToken) {
             IPancakeRouter02(uniRouterAddress).swapExactTokensForTokens(
                 earnedAlpacaBalance,
-                0,
+                earnedAlpacaBalance.mul(priceMin),
                 alpacaToWantPath,
                 address(this),
                 now.add(600)
@@ -225,8 +229,8 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         lastHarvestBlock = block.number;
     }
 
-    function harvest() external override onlyVaultOrOwner nonReentrantAndUnpaused {
-        _harvest();
+    function harvest(uint256 minPrice) external override onlyVaultOrKeeper nonReentrantAndUnpaused {
+        _harvest(minPrice);
     }
 
     /**
@@ -251,6 +255,14 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
 
     function setVault(address _vault) external onlyOwner {
         vault = _vault;
+    }
+
+    function setKeepers(address[] calldata _keepers, bool[] calldata _states) external onlyOwner {
+        uint256 n = _keepers.length;
+        for(uint256 i = 0; i < n; i++) {
+            keepers[_keepers[i]] = _states[i];
+        }
+        emit KeepersSet(_keepers, _states);
     }
 
     receive() external payable {}

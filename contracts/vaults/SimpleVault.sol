@@ -133,7 +133,6 @@ contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVa
      */
     function deposit(uint256 _amount) public override nonReentrantAndUnpaused returns (uint256) {
         require(!needWhitelist || isWhitelisted[msg.sender], "not whitelisted");
-        strategy.harvest();
 
         assetToken.safeTransferFrom(msg.sender, address(this), _amount);
         uint256 balanceOld = totalBalance();
@@ -165,7 +164,6 @@ contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVa
      */
     function _withdraw(uint256 _shares, address _recipient) internal returns (uint256) {
         require(!needWhitelist || isWhitelisted[msg.sender], "not whitelisted");
-        strategy.harvest();
 
         uint256 amount = (totalBalance().mul(_shares)).div(totalSupply());
         _burn(msg.sender, _shares);
@@ -220,7 +218,6 @@ contract SimpleVault is ERC20, UpgradeableOwnable, ReentrancyGuardPausable, IyVa
 
         emit UpgradeStrat(stratCandidate.implementation);
 
-        strategy.harvest();
         strategy.withdraw(totalBalance());
         assetToken.safeApprove(address(strategy), 0);
         strategy = ISimpleStrategy(stratCandidate.implementation);

@@ -293,5 +293,5 @@ interface ISimpleStrategy {
     function deposit(uint256 _tokenAmount) external;
     function withdraw(uint256 _tokenAmount) external;
     function totalBalance() external view returns (uint256);
-    function harvest() external;
+    function harvest(uint256 priceMin) external;
 }

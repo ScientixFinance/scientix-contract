@@ -57,7 +57,7 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
     constructor() public {}
 
     modifier claimReward() {
-        _collectReward(false);
+        _collectReward(false, 0);
 
         if (_balances[msg.sender] > 0) {
             uint256 pending = _balances[msg.sender].mul(_accRewardPerBalance).div(1e18).sub(_rewardDebt[msg.sender]);
@@ -291,11 +291,11 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
         _balances[account] = newBalance;
     }
 
-    function collectReward(bool buyback) public onlyKeeper nonReentrantAndUnpaused {
-        _collectReward(buyback);
+    function collectReward(bool buyback, uint256 priceMin) public onlyKeeper nonReentrantAndUnpaused {
+        _collectReward(buyback, priceMin);
     }
 
-    function _collectReward(bool buyback) private {
+    function _collectReward(bool buyback, uint256 priceMin) private {
         if (_totalSupply == 0)
             return;
         
@@ -306,7 +306,7 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
             _busd.safeTransferFrom(_collector, address(this), newReward);
             IPancakeRouter02(_pancakeRouterAddress).swapExactTokensForTokens(
                 newReward,
-                0,
+                newReward.mul(priceMin),
                 _busdToSCIXPath,
                 address(this),
                 now.add(600)
