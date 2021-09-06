@@ -1,10 +1,8 @@
 # scientix-contract
 
-Scientix is a friendly fork of Alchemix on Binance Smart Chain. Scientix is committed to Alchemix's vision of giving users advances on yield farming via a synthetic token that represents a fungible claim on any underlying collateral.
+Scientix is a future-yield-backed synthetic asset platform on Binance Smart Chain. It allows you to get interest-free loans that pay themselves off over time with no liquidation risk, while your collateral earns you yields in the background!
 
-Scientix has the same functionalities as Alchemix (depositing BUSD to borrow scUSD, transmuting scUSD to BUSD, liquidation, staking, etc.). The initial kind of collateral Scientix supports is BUSD. In the future, we may support other assets as well.
-
-
+Scientix Protocol has the functionalities: depositing BUSD to borrow scUSD, transmuting scUSD to BUSD, liquidation, staking, etc. The initial kind of collateral Scientix supports is BUSD. In the future, it may support other assets as well.
 
 # contracts
 ## Binance Smart Chain mainnet
