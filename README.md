@@ -6,5 +6,5 @@ Scientix Protocol has the functionalities: depositing BUSD to borrow scUSD, tran
 
 # contracts
 ## Binance Smart Chain mainnet
-- Scientist contract: 0x1c25da226ab9f03d30243465dd83f18bc22e2b0e
-- TransmuterB contract: 0x291fb4aae9f79f395b2106fbbe48fb484db8c24c
+- Scientist contract: 
+- TransmuterB contract: 
