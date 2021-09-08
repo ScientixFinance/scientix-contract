@@ -139,7 +139,7 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
         return 0;
     }
 
-    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+    function approve(address spender, uint256 amount) external virtual override returns (bool) {
         return false;
     }
 
@@ -148,7 +148,7 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
         address recipient,
         uint256 amount
     )
-        public virtual override returns (bool)
+        external virtual override returns (bool)
     {
         return false;
     }
@@ -291,7 +291,7 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
         _balances[account] = newBalance;
     }
 
-    function collectReward(bool buyback, uint256 priceMin) public onlyKeeper nonReentrantAndUnpaused {
+    function collectReward(bool buyback, uint256 priceMin) external onlyKeeper nonReentrantAndUnpaused {
         _collectReward(buyback, priceMin);
     }
 
