@@ -122,6 +122,8 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         alpacaVault = IAlpacaVault(_alpacaVault);
 
         wantToken = IERC20(_wantAddress);
+        wbnbAddress = _wbnbAddress;
+
         if (_wantAddress == wbnbAddress) {
             wantIsWBNB = true;
             alpacaToWantPath = [_alpacaToken, wbnbAddress];
@@ -129,7 +131,6 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
             alpacaToWantPath = [_alpacaToken, wbnbAddress, _wantAddress];
         }
 
-        wbnbAddress = _wbnbAddress;
         uniRouterAddress = _uniRouterAddress;
 
         wantToken.safeApprove(_alpacaVault, uint256(-1));
@@ -216,7 +217,7 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         if (alpacaToken != wantToken) {
             IPancakeRouter02(uniRouterAddress).swapExactTokensForTokens(
                 earnedAlpacaBalance,
-                earnedAlpacaBalance.mul(priceMin),
+                earnedAlpacaBalance.mul(priceMin).div(1e18),
                 alpacaToWantPath,
                 address(this),
                 now.add(600)

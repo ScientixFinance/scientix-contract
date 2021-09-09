@@ -306,7 +306,7 @@ contract VotingEscrow is IERC20, UpgradeableOwnable, Initializable, ReentrancyGu
             _busd.safeTransferFrom(_collector, address(this), newReward);
             IPancakeRouter02(_pancakeRouterAddress).swapExactTokensForTokens(
                 newReward,
-                newReward.mul(priceMin),
+                newReward.mul(priceMin).div(1e18),
                 _busdToSCIXPath,
                 address(this),
                 now.add(600)
