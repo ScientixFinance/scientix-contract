@@ -14,7 +14,17 @@ import { ReentrancyGuardPausable } from "../ReentrancyGuardPausable.sol";
 import "../UpgradeableOwnable.sol";
 
 
+interface IVaultConfig {
+  /// @dev Return the bps rate for reserve pool.
+  function getReservePoolBps() external view returns (uint256);
+}
+
 interface IAlpacaVault is IERC20 {
+
+  function config() external view returns (address);
+  function vaultDebtVal() external view returns (uint256);
+  function lastAccrueTime() external view returns (uint256);
+  function reservePool() external view returns (uint256);
 
   /// @dev Return the total ERC20 entitled to the token holders. Be careful of unaccrued interests.
   function totalToken() external view returns (uint256);
@@ -27,6 +37,8 @@ interface IAlpacaVault is IERC20 {
 
   /// @dev Request funds from user through Vault
   function requestFunds(address targetedToken, uint amount) external;
+
+  function pendingInterest(uint256 value) external view returns (uint256);
 
 }
 
@@ -149,6 +161,18 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
         _;
     }
 
+    function alpacaVaultTotalToken() public view returns (uint256) {
+        uint256 reservePool = alpacaVault.reservePool();
+        uint256 vaultDebtVal = alpacaVault.vaultDebtVal();
+        if (now > alpacaVault.lastAccrueTime()) {
+            uint256 interest = alpacaVault.pendingInterest(0);
+            uint256 toReserve = interest.mul(IVaultConfig(alpacaVault.config()).getReservePoolBps()).div(10000);
+            reservePool = reservePool.add(toReserve);
+            vaultDebtVal = vaultDebtVal.add(interest);
+        }
+        return wantToken.balanceOf(address(alpacaVault)).add(vaultDebtVal).sub(reservePool);
+    }
+    
     function _ibDeposited() internal view returns (uint256) {
         (uint256 ibBal,,,) = fairLaunch.userInfo(poolId, address(this));
         return ibBal;
@@ -156,11 +180,11 @@ contract StratAlpaca is UpgradeableOwnable, ReentrancyGuardPausable, ISimpleStra
 
     function totalBalance() external override view returns (uint256) {
         uint256 ibBal = _ibDeposited();
-        return alpacaVault.totalToken().mul(ibBal).div(alpacaVault.totalSupply());
+        return alpacaVaultTotalToken().mul(ibBal).div(alpacaVault.totalSupply());
     }
 
     function wantAmtToIbAmount(uint256 _wantAmt) public view returns (uint256) {
-        return _wantAmt.mul(alpacaVault.totalSupply()).div(alpacaVault.totalToken());
+        return _wantAmt.mul(alpacaVault.totalSupply()).div(alpacaVaultTotalToken());
     }
 
     function deposit(uint256 _wantAmt)
